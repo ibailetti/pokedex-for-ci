@@ -3,7 +3,7 @@ name: Pipeline
 on:
     push:
         branches:
-            - dev
+            - main
 jobs:
     test_message:
         runs-on: ubuntu-20.04
