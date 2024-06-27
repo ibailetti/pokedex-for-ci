@@ -30,3 +30,9 @@ jobs:
                 serviceId: ${{ secrets.RENDER_SERVICE_ID }}
                 apiKey: ${{ secrets.RENDER_API_KEY }}
                 multipleDeployment: false #optional, default true
+            - name: Info
+              run: |
+                curl --request GET \
+                  --url https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }} \
+                  --header 'accept: application/json' \
+                  --header 'authorization: Bearer ${{ secrets.RENDER_API_KEY }}'
