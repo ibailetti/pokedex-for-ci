@@ -83,7 +83,7 @@ jobs:
       - name: Test
         run: npm test
 
-  e2e-test:
+  e2e_test:
     needs: [lint, build]
     environment: develop
     runs-on: ubuntu-20.04
@@ -111,7 +111,7 @@ jobs:
           wait-on: http://localhost:5000
 
   deploy:
-    needs: [test, e2e-test]
+    needs: [test, e2e_test]
     environment: develop
     runs-on: ubuntu-20.04
     steps:
@@ -126,10 +126,16 @@ jobs:
           serviceId: ${{ secrets.RENDER_SERVICE_ID }}
           apiKey: ${{ secrets.RENDER_API_KEY }}
           multipleDeployment: false #optional, default true
-      - name: Info
-        run: |
-          curl --request GET \
-          --url https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }} \
-          --header 'accept: application/json' \
-          --header 'authorization: Bearer ${{ secrets.RENDER_API_KEY }}' \
-          | jq .
+          
+  info:
+    needs: [deploy]
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Info
+      run: |
+        curl --request GET \
+        --url https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }} \
+        --header 'accept: application/json' \
+        --header 'authorization: Bearer ${{ secrets.RENDER_API_KEY }}' \
+        | jq .
