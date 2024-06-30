@@ -1,47 +1,135 @@
 name: Develop Pipeline
 
 on:
-    push:
-        branches:
-            - dev
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize]
 
 jobs:
-    deploy:
-        environment: develop
-        runs-on: ubuntu-20.04
-        steps:
-            # https://github.com/marketplace/actions/checkout
-            - uses: actions/checkout@v2
-              with:
-                fetch-depth: 0
-            # https://github.com/marketplace/actions/setup-node-js-environment
-            - uses: actions/setup-node@v2
-              with:
-                node-version: '14'
-            - name: Install dependencies
-              run: npm install --no-audit --no-fund --no-optional
-            - name: Linter
-              run: npm run eslint
-            - name: Build
-              run: npm run build
-            - name: Test
-              run: npm test
-            # https://github.com/marketplace/actions/cypress-io
-            - name: Cypress run
-              uses: cypress-io/github-action@v6
-              with:
-                command: npm run test:e2e
-                start: npm run start-test
-                wait-on: http://localhost:5000
-            - name: Deploy to Render
-              uses: sws2apps/render-deployment@main #consider using pin for dependabot auto update
-              with:
-                serviceId: ${{ secrets.RENDER_SERVICE_ID }}
-                apiKey: ${{ secrets.RENDER_API_KEY }}
-                multipleDeployment: false #optional, default true
-            - name: Info
-              run: |
-                curl --request GET \
-                  --url https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }} \
-                  --header 'accept: application/json' \
-                  --header 'authorization: Bearer ${{ secrets.RENDER_API_KEY }}'
+  lint:
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # https://github.com/marketplace/actions/setup-node-js-environment
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm install ci
+      - name: Linter
+        run: npm run eslint
+
+  install_dependencies:
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # https://github.com/marketplace/actions/setup-node-js-environment
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --no-optional
+
+  build:
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # https://github.com/marketplace/actions/setup-node-js-environment
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm install ci
+      - name: Build
+        run: npm run build
+      - uses: actions/upload-artifact@v2
+        with:
+          name: dist
+          path: dist
+
+  test:
+    needs: [lint, build]
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # https://github.com/marketplace/actions/setup-node-js-environment
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --no-optional
+      - uses: actions/download-artifact@v2
+        with:
+          name: dist
+          path: dist
+      - name: Test
+        run: npm test
+
+  e2e-test:
+    needs: [lint, build]
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # https://github.com/marketplace/actions/setup-node-js-environment
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm install ci
+      - uses: actions/download-artifact@v2
+        with:
+          name: dist
+          path: dist
+      # https://github.com/marketplace/actions/cypress-io
+      - name: E2E test
+        uses: cypress-io/github-action@v6
+        with:
+          command: npm run test:e2e
+          start: npm run start-test
+          wait-on: http://localhost:5000
+
+  deploy:
+    needs: [test, e2e-test]
+    environment: develop
+    runs-on: ubuntu-20.04
+    steps:
+      # https://github.com/marketplace/actions/checkout
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Deploy to Render
+        if: ${{ github.event_name == 'push' }}
+        uses: sws2apps/render-deployment@main #consider using pin for dependabot auto update
+        with:
+          serviceId: ${{ secrets.RENDER_SERVICE_ID }}
+          apiKey: ${{ secrets.RENDER_API_KEY }}
+          multipleDeployment: false #optional, default true
+      - name: Info
+        run: |
+          curl --request GET \
+          --url https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }} \
+          --header 'accept: application/json' \
+          --header 'authorization: Bearer ${{ secrets.RENDER_API_KEY }}' \
+          | jq .
